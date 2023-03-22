@@ -22,35 +22,64 @@
 
 package com.raywenderlich.android.locaty
 
+import android.content.IntentFilter
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.raywenderlich.android.locaty.databinding.ActivityMainBinding
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityMainBinding
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.AppTheme)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver,  IntentFilter(LocatyService.KEY_ON_SENSOR_CHANGED_ACTION))
     }
 
     override fun onResume() {
         super.onResume()
-
+        startForegroundServiceForSensors(false) //false parce que foreground
     }
 
     private fun startForegroundServiceForSensors(background: Boolean) {
-
+        // Création d'un Intent pour le service
+        val locatyIntent = Intent(this, LocatyService::class.java)
+        locatyIntent.putExtra(LocatyService.KEY_BACKGROUND, background)
+        // Démarrage du service "foreground
+        ContextCompat.startForegroundService(this, locatyIntent)
     }
 
     override fun onPause() {
         super.onPause()
+        startForegroundServiceForSensors(true) //true car plus foreground
     }
 
     override fun onDestroy() {
+        // unregisterd BroadcastReceiver qaund on en n'a plus besoin
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver)
         super.onDestroy()
     }
+
+    private val broadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            // Recuperation des données et assignation aux vues
+            val direction = intent.getStringExtra(LocatyService.KEY_DIRECTION)
+            val angle = intent.getDoubleExtra(LocatyService.KEY_ANGLE,0.0)
+            val angleWithDirection = "$angle  $direction"
+            binding.directionTextView.text = angleWithDirection
+            // Reflexion de l'angle car angle inverse au sens des aiguilles d'une montre alors que vues Android tourne dans le sens des aiguilles d'une montre
+            binding.compassImageView.rotation = angle.toFloat() * -1
+        }
+    }
 }
+
+//tutoriel https://www.kodeco.com/10838302-sensors-tutorial-for-android-getting-started
